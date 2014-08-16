@@ -56,7 +56,7 @@ public:
     * @param req the data post to uri.
     * @param res the response data from server.
     */
-    virtual int post(SrsHttpUri* uri, std::string req, std::string& res);
+    virtual int post(SrsHttpUri* uri, std::string req, std::string& res, const char* content_type = NULL);
 private:
     virtual void disconnect();
     virtual int connect(SrsHttpUri* uri);

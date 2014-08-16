@@ -76,7 +76,7 @@ int SrsHttpHooks::on_connect(string url, int client_id, string ip, SrsRequest* r
     std::string res;
     
     SrsHttpClient http;
-    if ((ret = http.post(&uri, data, res)) != ERROR_SUCCESS) {
+    if ((ret = http.post(&uri, data, res, "application/json")) != ERROR_SUCCESS) {
         srs_error("http post on_connect uri failed. "
             "client_id=%d, url=%s, request=%s, response=%s, ret=%d",
             client_id, url.c_str(), data.c_str(), res.c_str(), ret);
@@ -121,7 +121,7 @@ void SrsHttpHooks::on_close(string url, int client_id, string ip, SrsRequest* re
     std::string res;
     
     SrsHttpClient http;
-    if ((ret = http.post(&uri, data, res)) != ERROR_SUCCESS) {
+    if ((ret = http.post(&uri, data, res, "application/json")) != ERROR_SUCCESS) {
         srs_warn("http post on_close uri failed, ignored. "
             "client_id=%d, url=%s, request=%s, response=%s, ret=%d",
             client_id, url.c_str(), data.c_str(), res.c_str(), ret);
@@ -161,13 +161,14 @@ int SrsHttpHooks::on_publish(string url, int client_id, string ip, SrsRequest* r
         << __SRS_JFIELD_STR("vhost", req->vhost) << __SRS_JFIELD_CONT
         << __SRS_JFIELD_STR("app", req->app) << __SRS_JFIELD_CONT
         << __SRS_JFIELD_STR("pageUrl", req->pageUrl) << __SRS_JFIELD_CONT
+        << __SRS_JFIELD_STR("tcUrl", req->tcUrl) << __SRS_JFIELD_CONT
         << __SRS_JFIELD_STR("stream", req->stream)
         << __SRS_JOBJECT_END;
     std::string data = ss.str();
     std::string res;
     
     SrsHttpClient http;
-    if ((ret = http.post(&uri, data, res)) != ERROR_SUCCESS) {
+    if ((ret = http.post(&uri, data, res, "application/json")) != ERROR_SUCCESS) {
         srs_error("http post on_publish uri failed. "
             "client_id=%d, url=%s, request=%s, response=%s, ret=%d",
             client_id, url.c_str(), data.c_str(), res.c_str(), ret);
@@ -213,7 +214,7 @@ void SrsHttpHooks::on_unpublish(string url, int client_id, string ip, SrsRequest
     std::string res;
     
     SrsHttpClient http;
-    if ((ret = http.post(&uri, data, res)) != ERROR_SUCCESS) {
+    if ((ret = http.post(&uri, data, res, "application/json")) != ERROR_SUCCESS) {
         srs_warn("http post on_unpublish uri failed, ignored. "
             "client_id=%d, url=%s, request=%s, response=%s, ret=%d",
             client_id, url.c_str(), data.c_str(), res.c_str(), ret);
@@ -259,7 +260,7 @@ int SrsHttpHooks::on_play(string url, int client_id, string ip, SrsRequest* req)
     std::string res;
     
     SrsHttpClient http;
-    if ((ret = http.post(&uri, data, res)) != ERROR_SUCCESS) {
+    if ((ret = http.post(&uri, data, res, "application/json")) != ERROR_SUCCESS) {
         srs_error("http post on_play uri failed. "
             "client_id=%d, url=%s, request=%s, response=%s, ret=%d",
             client_id, url.c_str(), data.c_str(), res.c_str(), ret);
@@ -305,7 +306,7 @@ void SrsHttpHooks::on_stop(string url, int client_id, string ip, SrsRequest* req
     std::string res;
     
     SrsHttpClient http;
-    if ((ret = http.post(&uri, data, res)) != ERROR_SUCCESS) {
+    if ((ret = http.post(&uri, data, res, "application/json")) != ERROR_SUCCESS) {
         srs_warn("http post on_stop uri failed, ignored. "
             "client_id=%d, url=%s, request=%s, response=%s, ret=%d",
             client_id, url.c_str(), data.c_str(), res.c_str(), ret);

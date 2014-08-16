@@ -52,7 +52,7 @@ SrsHttpClient::~SrsHttpClient()
     srs_freep(parser);
 }
 
-int SrsHttpClient::post(SrsHttpUri* uri, string req, string& res)
+int SrsHttpClient::post(SrsHttpUri* uri, string req, string& res, const char* content_type)
 {
     res = "";
     
@@ -81,7 +81,7 @@ int SrsHttpClient::post(SrsHttpUri* uri, string req, string& res)
         << "Connection: Keep-Alive" << __SRS_CRLF
         << "Content-Length: " << std::dec << req.length() << __SRS_CRLF
         << "User-Agent: " << RTMP_SIG_SRS_NAME << RTMP_SIG_SRS_VERSION << __SRS_CRLF
-        << "Content-Type: text/html" << __SRS_CRLF
+        << "Content-Type: " << (content_type ? content_type : "text/html") << __SRS_CRLF
         << __SRS_CRLF
         << req;
     
