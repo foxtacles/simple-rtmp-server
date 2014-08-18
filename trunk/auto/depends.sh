@@ -351,8 +351,21 @@ if [ ! -f ${SRS_OBJS}/st/libst.a ]; then echo "build st-1.9 static lib failed.";
 #####################################################################################
 # check the arm flag file, if flag changed, need to rebuild the st.
 if [ $SRS_HTTP_PARSER = YES ]; then
+    # for osx(darwin), donot use sed.
+    if [ $SRS_OSX = YES ]; then 
+        if [[ -f ${SRS_OBJS}/hp/http_parser.h && -f ${SRS_OBJS}/hp/libhttp_parser.a ]]; then
+            echo "http-parser-2.1 is ok.";
+        else
+            echo "build http-parser-2.1 for osx(darwin)";
+            (
+                rm -rf ${SRS_OBJS}/http-parser-2.1 && cd ${SRS_OBJS} && unzip -q ../3rdparty/http-parser-2.1.zip && 
+                cd http-parser-2.1 && 
+                make package &&
+                cd .. && rm -rf hp && ln -sf http-parser-2.1 hp
+            )
+        fi
     # ok, arm specified, if the flag filed does not exists, need to rebuild.
-    if [ $SRS_EMBEDED_CPU = YES ]; then
+    elif [ $SRS_EMBEDED_CPU = YES ]; then
         if [[ -f ${SRS_OBJS}/_flag.st.hp.tmp && -f ${SRS_OBJS}/hp/http_parser.h && -f ${SRS_OBJS}/hp/libhttp_parser.a ]]; then
             echo "http-parser-2.1 for arm is ok.";
         else
@@ -554,6 +567,24 @@ fi
 #####################################################################################
 # openssl, for rtmp complex handshake
 #####################################################################################
+# extra configure options
+CONFIGURE_TOOL="./config"
+EXTRA_CONFIGURE=""
+if [ $SRS_OSX = YES ]; then
+    CONFIGURE_TOOL="./Configure"
+    arch=`uname -m` && echo "OSX $arch";
+    if [ $arch = x86_64 ]; then
+        echo "configure 64bit openssl";
+        EXTRA_CONFIGURE=darwin64-x86_64-cc
+    else
+        echo "configure 32bit openssl";
+        EXTRA_CONFIGURE=darwin-i386-cc
+    fi
+    echo "openssl extra config: $CONFIGURE_TOOL $EXTRA_CONFIGURE"
+fi
+if [ $SRS_EMBEDED_CPU = YES ]; then
+    CONFIGURE_TOOL="./Configure"
+fi
 # @see http://www.openssl.org/news/secadv_20140407.txt
 # Affected users should upgrade to OpenSSL 1.0.1g. Users unable to immediately
 # upgrade can alternatively recompile OpenSSL with -DOPENSSL_NO_HEARTBEATS.
@@ -571,7 +602,7 @@ if [ $SRS_SSL = YES ]; then
                 (
                     rm -rf ${SRS_OBJS}/openssl-1.0.1f && cd ${SRS_OBJS} && 
                     unzip -q ../3rdparty/openssl-1.0.1f.zip && cd openssl-1.0.1f && 
-                    ./Configure --prefix=`pwd`/_release -no-shared no-asm linux-armv4 -DOPENSSL_NO_HEARTBEATS && 
+                    $CONFIGURE_TOOL --prefix=`pwd`/_release -no-shared no-asm linux-armv4 -DOPENSSL_NO_HEARTBEATS ${EXTRA_CONFIGURE} && 
                     make CC=${SrsArmCC} GCC=${SrsArmGCC} AR="${SrsArmAR} r" \
                         LD=${SrsArmLD} LINK=${SrsArmGCC} RANDLIB=${SrsArmRANDLIB} && 
                     make install_sw &&
@@ -588,7 +619,7 @@ if [ $SRS_SSL = YES ]; then
                 (
                     rm -rf ${SRS_OBJS}/openssl-1.0.1f && cd ${SRS_OBJS} && 
                     unzip -q ../3rdparty/openssl-1.0.1f.zip && cd openssl-1.0.1f && 
-                    ./config --prefix=`pwd`/_release -no-shared -DOPENSSL_NO_HEARTBEATS && 
+                    $CONFIGURE_TOOL --prefix=`pwd`/_release -no-shared -DOPENSSL_NO_HEARTBEATS ${EXTRA_CONFIGURE} && 
                     make && make install_sw &&
                     cd .. && rm -rf openssl && ln -sf openssl-1.0.1f/_release openssl &&
                     cd .. && rm -f ${SRS_OBJS}/_flag.ssl.arm.tmp
@@ -645,6 +676,13 @@ if [ $SRS_INGEST = YES ]; then
     echo "#define SRS_AUTO_INGEST" >> $SRS_AUTO_HEADERS_H
 else
     echo "#undef SRS_AUTO_INGEST" >> $SRS_AUTO_HEADERS_H
+fi
+
+# for statistic.
+if [ $SRS_STAT = YES ]; then
+    echo "#define SRS_AUTO_STAT" >> $SRS_AUTO_HEADERS_H
+else
+    echo "#undef SRS_AUTO_STAT" >> $SRS_AUTO_HEADERS_H
 fi
 
 #####################################################################################
@@ -780,11 +818,7 @@ echo "" >> $SRS_AUTO_HEADERS_H
 #####################################################################################
 # generated the contributors from AUTHORS.txt
 #####################################################################################
-if [ $OS_IS_CENTOS = YES ]; then
-    SRS_CONSTRIBUTORS=`cat ../AUTHORS.txt|grep "*"|awk -F '* ' '{print $2}'`
-else
-    SRS_CONSTRIBUTORS=`cat ../AUTHORS.txt|grep "*"|awk -F '\* ' '{print $2}'`
-fi
+SRS_CONSTRIBUTORS=`cat ../AUTHORS.txt|grep "*"|awk '{print $2}'`
 echo "#define SRS_AUTO_CONSTRIBUTORS \"\\" >> $SRS_AUTO_HEADERS_H
 for CONTRIBUTOR in $SRS_CONSTRIBUTORS; do
     echo "${CONTRIBUTOR} \\" >> $SRS_AUTO_HEADERS_H
