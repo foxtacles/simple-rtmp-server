@@ -323,6 +323,10 @@ public:
     * parse the cli, the main(argc,argv) function.
     */
     virtual int parse_options(int argc, char** argv);
+    /**
+    * get the config file path.
+    */
+    virtual std::string config();
 private:
     /**
     * parse each argv.
@@ -466,6 +470,15 @@ public:
     * @remark, default true.
     */
     virtual bool                get_gop_cache(std::string vhost);
+    /**
+    * whether debug_srs_upnode is enabled of vhost.
+    * debug_srs_upnode is very important feature for tracable log,
+    * but some server, for instance, flussonic donot support it.
+    * @see https://github.com/winlinvip/simple-rtmp-server/issues/160
+    * @return true when debug_srs_upnode is ok; otherwise, false.
+    * @remark, default true.
+    */
+    virtual bool                get_debug_srs_upnode(std::string vhost);
     /**
     * whether atc is enabled of vhost.
     * atc always use encoder timestamp, SRS never adjust the time.

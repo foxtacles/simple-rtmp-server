@@ -177,9 +177,9 @@ Supported operating systems and hardware:
 1. Support [vod stream(http flv/hls vod stream)](https://github.com/winlinvip/simple-rtmp-server/wiki/FlvVodStream).
 1. Support DRM [token traverse](https://github.com/winlinvip/simple-rtmp-server/wiki/DRM#tokentraverse) for fms origin authenticate.
 1. [dev] Support system full utest on gtest.
-1. [plan] Support <500ms latency, FRSC(Fast RTMP-compatible Stream Channel tech).
-1. [plan] Support RTMP 302 redirect [#92](https://github.com/winlinvip/simple-rtmp-server/issues/92).
-1. [plan] Support multiple processes, for both origin and edge
+1. [no-plan] Support <500ms latency, FRSC(Fast RTMP-compatible Stream Channel tech).
+1. [no-plan] Support RTMP 302 redirect [#92](https://github.com/winlinvip/simple-rtmp-server/issues/92).
+1. [no-plan] Support multiple processes, for both origin and edge
 1. [no-plan] Support adobe RTMFP(flash p2p) protocol.
 1. [no-plan] Support adobe flash refer/token/swf verification.
 1. [no-plan] Support adobe amf3 codec.
@@ -208,6 +208,11 @@ Supported operating systems and hardware:
 * 2013-10-17, Created.<br/>
 
 ## History
+* v1.0, 2014-08-28, fix [#167](https://github.com/winlinvip/simple-rtmp-server/issues/167), add openssl includes to utest. 0.9.209.
+* v1.0, 2014-08-27, max connections is 32756, for st use mmap default. 0.9.209
+* v1.0, 2014-08-24, fix [#150](https://github.com/winlinvip/simple-rtmp-server/issues/150), forward should forward the sequence header when retry. 0.9.208.
+* v1.0, 2014-08-22, for [#165](https://github.com/winlinvip/simple-rtmp-server/issues/165), refine dh wrapper, ensure public key is 128bytes. 0.9.206.
+* v1.0, 2014-08-19, for [#160](https://github.com/winlinvip/simple-rtmp-server/issues/160), support forward/edge to flussonic, disable debug_srs_upnode to make flussonic happy. 0.9.201.
 * v1.0, 2014-08-17, for [#155](https://github.com/winlinvip/simple-rtmp-server/issues/155), refine for osx, with ssl/http, disable statistics. 0.9.198.
 * v1.0, 2014-08-06, fix [#148](https://github.com/winlinvip/simple-rtmp-server/issues/148), simplify the RTMP handshake key generation. 0.9.191.
 * v1.0, 2014-08-06, fix [#147](https://github.com/winlinvip/simple-rtmp-server/issues/147), support identify the srs edge. 0.9.190.
