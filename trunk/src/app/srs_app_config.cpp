@@ -436,7 +436,7 @@ int SrsConfig::reload_conf(SrsConfig* conf)
     // always support reload without additional code:
     //      chunk_size, ff_log_dir, max_connections,
     //      bandcheck, http_hooks, heartbeat, 
-    //      token_traverse
+    //      token_traverse, debug_srs_upnode
 
     // merge config: listen
     if (!srs_directive_equals(root->get("listen"), old_root->get("listen"))) {
@@ -1086,6 +1086,11 @@ int SrsConfig::parse_options(int argc, char** argv)
     return ret;
 }
 
+string SrsConfig::config()
+{
+    return config_file;
+}
+
 int SrsConfig::parse_argv(int& i, char** argv)
 {
     int ret = ERROR_SUCCESS;
@@ -1285,6 +1290,7 @@ int SrsConfig::check_config()
                 && n != "forward" && n != "transcode" && n != "bandcheck"
                 && n != "time_jitter" 
                 && n != "atc" && n != "atc_auto"
+                && n != "debug_srs_upnode"
             ) {
                 ret = ERROR_SYSTEM_CONFIG_INVALID;
                 srs_error("unsupported vhost directive %s, ret=%d", n.c_str(), ret);
@@ -1878,6 +1884,22 @@ bool SrsConfig::get_gop_cache(string vhost)
     }
     
     conf = conf->get("gop_cache");
+    if (conf && conf->arg0() == "off") {
+        return false;
+    }
+    
+    return true;
+}
+
+bool SrsConfig::get_debug_srs_upnode(string vhost)
+{
+    SrsConfDirective* conf = get_vhost(vhost);
+
+    if (!conf) {
+        return true;
+    }
+    
+    conf = conf->get("debug_srs_upnode");
     if (conf && conf->arg0() == "off") {
         return false;
     }
@@ -2726,6 +2748,30 @@ string SrsConfig::get_ingest_input_url(SrsConfDirective* ingest)
     return conf->arg0();
 }
 
+bool SrsConfig::get_log_tank_file()
+{
+    srs_assert(root);
+    
+    SrsConfDirective* conf = root->get("srs_log_tank");
+    if (conf && conf->arg0() == SRS_CONF_DEFAULT_LOG_TANK_CONSOLE) {
+        return false;
+    }
+    
+    return true;
+}
+
+string SrsConfig::get_log_level()
+{
+    srs_assert(root);
+    
+    SrsConfDirective* conf = root->get("srs_log_level");
+    if (!conf || conf->arg0().empty()) {
+        return SRS_CONF_DEFAULT_LOG_LEVEL;
+    }
+    
+    return conf->arg0();
+}
+
 string SrsConfig::get_log_file()
 {
     srs_assert(root);
@@ -2754,30 +2800,6 @@ string SrsConfig::get_ffmpeg_log_dir()
     }
     
     return conf->arg0();
-}
-
-string SrsConfig::get_log_level()
-{
-    srs_assert(root);
-    
-    SrsConfDirective* conf = root->get("srs_log_level");
-    if (!conf || conf->arg0().empty()) {
-        return SRS_CONF_DEFAULT_LOG_LEVEL;
-    }
-    
-    return conf->arg0();
-}
-
-bool SrsConfig::get_log_tank_file()
-{
-    srs_assert(root);
-    
-    SrsConfDirective* conf = root->get("srs_log_tank");
-    if (conf && conf->arg0() == SRS_CONF_DEFAULT_LOG_TANK_CONSOLE) {
-        return false;
-    }
-    
-    return true;
 }
 
 SrsConfDirective* SrsConfig::get_hls(string vhost)

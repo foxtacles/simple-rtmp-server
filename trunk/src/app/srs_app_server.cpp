@@ -552,6 +552,17 @@ int SrsServer::initialize_st()
     }
     srs_verbose("st_init success");
     
+    // @remark, st alloc segment use mmap, which only support 32757 threads,
+    // if need to support more, for instance, 100k threads, define the macro MALLOC_STACK.
+    // TODO: FIXME: maybe can use "sysctl vm.max_map_count" to refine.
+    if (_srs_config->get_max_connections() > 32756) {
+        ret = ERROR_ST_EXCEED_THREADS;
+        srs_error("st mmap for stack allocation must <= %d threads, "
+            "@see Makefile of st for MALLOC_STACK, please build st manually by "
+            "\"make EXTRA_CFLAGS=-DMALLOC_STACK linux-debug\", ret=%d", ret);
+        return ret;
+    }
+    
     // set current log id.
     _srs_context->generate_id();
     srs_trace("server main cid=%d", _srs_context->get_id());
@@ -671,6 +682,8 @@ int SrsServer::do_cycle()
     
     // find the max loop
     int max = srs_max(0, SRS_SYS_TIME_RESOLUTION_MS_TIMES);
+    
+#ifdef SRS_AUTO_STAT
     max = srs_max(max, SRS_SYS_RUSAGE_RESOLUTION_TIMES);
     max = srs_max(max, SRS_SYS_CPU_STAT_RESOLUTION_TIMES);
     max = srs_max(max, SRS_SYS_DISK_STAT_RESOLUTION_TIMES);
@@ -678,6 +691,7 @@ int SrsServer::do_cycle()
     max = srs_max(max, SRS_SYS_PLATFORM_INFO_RESOLUTION_TIMES);
     max = srs_max(max, SRS_SYS_NETWORK_DEVICE_RESOLUTION_TIMES);
     max = srs_max(max, SRS_SYS_NETWORK_RTMP_SERVER_RESOLUTION_TIMES);
+#endif
     
     // the deamon thread, update the time cache
     while (true) {
@@ -719,6 +733,8 @@ int SrsServer::do_cycle()
                 srs_info("update current time cache.");
                 srs_update_system_time_ms();
             }
+            
+#ifdef SRS_AUTO_STAT
             if ((i % SRS_SYS_RUSAGE_RESOLUTION_TIMES) == 0) {
                 srs_info("update resource info, rss.");
                 srs_update_system_rusage();
@@ -748,13 +764,14 @@ int SrsServer::do_cycle()
                 resample_kbps(NULL);
                 srs_update_rtmp_server((int)conns.size(), kbps);
             }
-#ifdef SRS_AUTO_HTTP_PARSER
+    #ifdef SRS_AUTO_HTTP_PARSER
             if (_srs_config->get_heartbeat_enabled()) {
                 if ((i % heartbeat_max_resolution) == 0) {
                     srs_info("do http heartbeat, for internal server to report.");
                     http_heartbeat->heartbeat();
                 }
             }
+    #endif
 #endif
             srs_info("server main thread loop");
         }

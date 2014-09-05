@@ -177,9 +177,9 @@ Supported operating systems and hardware:
 1. Support [vod stream(http flv/hls vod stream)](https://github.com/winlinvip/simple-rtmp-server/wiki/FlvVodStream).
 1. Support DRM [token traverse](https://github.com/winlinvip/simple-rtmp-server/wiki/DRM#tokentraverse) for fms origin authenticate.
 1. [dev] Support system full utest on gtest.
-1. [plan] Support <500ms latency, FRSC(Fast RTMP-compatible Stream Channel tech).
-1. [plan] Support RTMP 302 redirect [#92](https://github.com/winlinvip/simple-rtmp-server/issues/92).
-1. [plan] Support multiple processes, for both origin and edge
+1. [no-plan] Support <500ms latency, FRSC(Fast RTMP-compatible Stream Channel tech).
+1. [no-plan] Support RTMP 302 redirect [#92](https://github.com/winlinvip/simple-rtmp-server/issues/92).
+1. [no-plan] Support multiple processes, for both origin and edge
 1. [no-plan] Support adobe RTMFP(flash p2p) protocol.
 1. [no-plan] Support adobe flash refer/token/swf verification.
 1. [no-plan] Support adobe amf3 codec.
@@ -189,7 +189,7 @@ Supported operating systems and hardware:
 1. [no-plan] Support RTP/RTSP server.
 
 ## Releases
-* 2014-08-03, [Release v1.0-mainline7](https://github.com/winlinvip/simple-rtmp-server/releases/tag/1.0.mainline7), config utest, support osx(darwin), all bug fixed. 57432 lines.<br/>
+* 2014-08-03, [Release v1.0-mainline7](https://github.com/winlinvip/simple-rtmp-server/releases/tag/1.0.mainline7), config utest, all bug fixed. 57432 lines.<br/>
 * 2014-07-13, [Release v1.0-mainline6](https://github.com/winlinvip/simple-rtmp-server/releases/tag/1.0.mainline6), core/kernel/rtmp utest, refine bandwidth(as/js/srslibrtmp library). 50029 lines.<br/>
 * 2014-06-27, [Release v1.0-mainline5](https://github.com/winlinvip/simple-rtmp-server/releases/tag/1.0.mainline5), refine perf 3k+ clients, edge token traverse, [srs monitor](http://ossrs.net:1977), 30days online. 41573 lines.<br/>
 * 2014-05-28, [Release v1.0-mainline4](https://github.com/winlinvip/simple-rtmp-server/releases/tag/1.0.mainline4), support heartbeat, tracable log, fix mem leak and bugs. 39200 lines.<br/>
@@ -208,6 +208,12 @@ Supported operating systems and hardware:
 * 2013-10-17, Created.<br/>
 
 ## History
+* v1.0, 2014-08-28, fix [#167](https://github.com/winlinvip/simple-rtmp-server/issues/167), add openssl includes to utest. 0.9.209.
+* v1.0, 2014-08-27, max connections is 32756, for st use mmap default. 0.9.209
+* v1.0, 2014-08-24, fix [#150](https://github.com/winlinvip/simple-rtmp-server/issues/150), forward should forward the sequence header when retry. 0.9.208.
+* v1.0, 2014-08-22, for [#165](https://github.com/winlinvip/simple-rtmp-server/issues/165), refine dh wrapper, ensure public key is 128bytes. 0.9.206.
+* v1.0, 2014-08-19, for [#160](https://github.com/winlinvip/simple-rtmp-server/issues/160), support forward/edge to flussonic, disable debug_srs_upnode to make flussonic happy. 0.9.201.
+* v1.0, 2014-08-17, for [#155](https://github.com/winlinvip/simple-rtmp-server/issues/155), refine for osx, with ssl/http, disable statistics. 0.9.198.
 * v1.0, 2014-08-06, fix [#148](https://github.com/winlinvip/simple-rtmp-server/issues/148), simplify the RTMP handshake key generation. 0.9.191.
 * v1.0, 2014-08-06, fix [#147](https://github.com/winlinvip/simple-rtmp-server/issues/147), support identify the srs edge. 0.9.190.
 * <strong>v1.0, 2014-08-03, [1.0 mainline7(0.9.189)](https://github.com/winlinvip/simple-rtmp-server/releases/tag/1.0.mainline7) released. 57432 lines.</strong>
@@ -219,7 +225,7 @@ Supported operating systems and hardware:
 * v1.0, 2014-08-02, fix [#138](https://github.com/winlinvip/simple-rtmp-server/issues/138), fix http hooks bug, regression bug. 0.9.184.
 * v1.0, 2014-08-02, fix [#142](https://github.com/winlinvip/simple-rtmp-server/issues/142), fix tcp stat slow bug, use /proc/net/sockstat instead, refer to 'ss -s'. 0.9.183.
 * v1.0, 2014-07-31, fix [#141](https://github.com/winlinvip/simple-rtmp-server/issues/141), support tun0(vpn network device) ip retrieve. 0.9.179.
-* v1.0, 2014-07-27, support build on OSX(Darwin). 0.9.177
+* v1.0, 2014-07-27, support partially build on OSX(Darwin). 0.9.177
 * v1.0, 2014-07-27, api connections add udp, add disk iops. 0.9.176
 * v1.0, 2014-07-26, complete config utest. 0.9.173
 * v1.0, 2014-07-26, fix [#124](https://github.com/winlinvip/simple-rtmp-server/issues/124), gop cache support disable video in publishing. 0.9.171.
