@@ -24,7 +24,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <srs_app_st_socket.hpp>
 
 #include <srs_kernel_error.hpp>
-#include <srs_kernel_utility.hpp>
 
 SrsStSocket::SrsStSocket(st_netfd_t client_stfd)
 {
@@ -83,8 +82,10 @@ int SrsStSocket::read(void* buf, size_t size, ssize_t* nread)
     
     // On success a non-negative integer indicating the number of bytes actually read is returned 
     // (a value of 0 means the network connection is closed or end of file is reached).
+    // Otherwise, a value of -1 is returned and errno is set to indicate the error. 
     if (nb_read <= 0) {
-        if (errno == ETIME) {
+        // @see https://github.com/winlinvip/simple-rtmp-server/issues/200
+        if (nb_read < 0 && errno == ETIME) {
             return ERROR_SOCKET_TIMEOUT;
         }
         
@@ -111,8 +112,10 @@ int SrsStSocket::read_fully(void* buf, size_t size, ssize_t* nread)
     
     // On success a non-negative integer indicating the number of bytes actually read is returned 
     // (a value less than nbyte means the network connection is closed or end of file is reached)
+    // Otherwise, a value of -1 is returned and errno is set to indicate the error. 
     if (nb_read != (ssize_t)size) {
-        if (errno == ETIME) {
+        // @see https://github.com/winlinvip/simple-rtmp-server/issues/200
+        if (nb_read < 0 && errno == ETIME) {
             return ERROR_SOCKET_TIMEOUT;
         }
         
@@ -137,8 +140,11 @@ int SrsStSocket::write(void* buf, size_t size, ssize_t* nwrite)
         *nwrite = nb_write;
     }
     
+    // On success a non-negative integer equal to nbyte is returned. 
+    // Otherwise, a value of -1 is returned and errno is set to indicate the error.
     if (nb_write <= 0) {
-        if (errno == ETIME) {
+        // @see https://github.com/winlinvip/simple-rtmp-server/issues/200
+        if (nb_write < 0 && errno == ETIME) {
             return ERROR_SOCKET_TIMEOUT;
         }
         
@@ -159,8 +165,11 @@ int SrsStSocket::writev(const iovec *iov, int iov_size, ssize_t* nwrite)
         *nwrite = nb_write;
     }
     
+    // On success a non-negative integer equal to nbyte is returned. 
+    // Otherwise, a value of -1 is returned and errno is set to indicate the error.
     if (nb_write <= 0) {
-        if (errno == ETIME) {
+        // @see https://github.com/winlinvip/simple-rtmp-server/issues/200
+        if (nb_write < 0 && errno == ETIME) {
             return ERROR_SOCKET_TIMEOUT;
         }
         

@@ -48,17 +48,7 @@ using namespace std;
 
 using namespace _srs_internal;
 
-#define SRS_WIKI_URL_LOG "https://github.com/winlinvip/simple-rtmp-server/wiki/SrsLog"
-
-#define FILE_OFFSET(fd) lseek(fd, 0, SEEK_CUR)
-
-int64_t FILE_SIZE(int fd)
-{
-    int64_t pre = FILE_OFFSET(fd);
-    int64_t pos = lseek(fd, 0, SEEK_END);
-    lseek(fd, pre, SEEK_SET);
-    return pos;
-}
+#define SRS_WIKI_URL_LOG "https://github.com/winlinvip/simple-rtmp-server/wiki/v1_CN_SrsLog"
 
 // '\n'
 #define __LF (char)0x0a
@@ -407,12 +397,19 @@ int SrsConfig::reload()
     int ret = ERROR_SUCCESS;
 
     SrsConfig conf;
+
     if ((ret = conf.parse_file(config_file.c_str())) != ERROR_SUCCESS) {
         srs_error("ignore config reloader parse file failed. ret=%d", ret);
         ret = ERROR_SUCCESS;
         return ret;
     }
     srs_info("config reloader parse file success.");
+
+    if ((ret = conf.check_config()) != ERROR_SUCCESS) {
+        srs_error("ignore config reloader check config failed. ret=%d", ret);
+        ret = ERROR_SUCCESS;
+        return ret;
+    }
     
     return reload_conf(&conf);
 }
@@ -800,6 +797,7 @@ int SrsConfig::reload_vhost(SrsConfDirective* old_root)
                 srs_trace("vhost %s reload forward success.", vhost.c_str());
             }
             // hls, only one per vhost
+            // @remark, the hls_on_error directly support reload.
             if (!srs_directive_equals(new_vhost->get("hls"), old_vhost->get("hls"))) {
                 for (it = subscribes.begin(); it != subscribes.end(); ++it) {
                     ISrsReloadHandler* subscribe = *it;
@@ -1074,12 +1072,37 @@ int SrsConfig::parse_options(int argc, char** argv)
     ret = parse_file(config_file.c_str());
     
     if (test_conf) {
+        // the parse_file never check the config,
+        // we check it when user requires check config file.
+        if (ret == ERROR_SUCCESS) {
+            ret = check_config();
+        }
+
         if (ret == ERROR_SUCCESS) {
             srs_trace("config file is ok");
             exit(0);
         } else {
             srs_error("config file is invalid");
             exit(ret);
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////////////
+    // check log name and level
+    ////////////////////////////////////////////////////////////////////////
+    if (true) {
+        std::string log_filename = this->get_log_file();
+        if (get_log_tank_file() && log_filename.empty()) {
+            ret = ERROR_SYSTEM_CONFIG_INVALID;
+            srs_error("must specifies the file to write log to. ret=%d", ret);
+            return ret;
+        }
+        if (get_log_tank_file()) {
+            srs_trace("write log to file %s", log_filename.c_str());
+            srs_trace("you can: tailf %s", log_filename.c_str());
+            srs_trace("@see: %s", SRS_WIKI_URL_LOG);
+        } else {
+            srs_trace("write log to console");
         }
     }
     
@@ -1145,7 +1168,8 @@ void SrsConfig::print_help(char** argv)
     printf(
         RTMP_SIG_SRS_NAME" "RTMP_SIG_SRS_VERSION" "RTMP_SIG_SRS_COPYRIGHT"\n" 
         "license: "RTMP_SIG_SRS_LICENSE"\n"
-        "Primary Authors: "RTMP_SIG_SRS_PRIMARY_AUTHROS"\n"
+        "Primary: "RTMP_SIG_SRS_PRIMARY"\n"
+        "Authors: "RTMP_SIG_SRS_AUTHROS"\n"
         "Build: "SRS_AUTO_BUILD_DATE" Configuration:"SRS_AUTO_USER_CONFIGURE"\n"
         "Features:"SRS_AUTO_CONFIGURE"\n""\n"
         "Usage: %s [-h?vV] [[-t] -c <filename>]\n" 
@@ -1189,6 +1213,8 @@ int SrsConfig::parse_file(const char* filename)
 int SrsConfig::check_config()
 {
     int ret = ERROR_SUCCESS;
+
+    srs_trace("srs checking config...");
     
     vector<SrsConfDirective*> vhosts = get_vhosts();
 
@@ -1301,7 +1327,7 @@ int SrsConfig::check_config()
                 for (int j = 0; j < (int)conf->directives.size(); j++) {
                     string m = conf->at(j)->name.c_str();
                     if (m != "enabled" && m != "dvr_path" && m != "dvr_plan"
-                        && m != "dvr_duration" && m != "time_jitter"
+                        && m != "dvr_duration" && m != "dvr_wait_keyframe" && m != "time_jitter"
                     ) {
                         ret = ERROR_SYSTEM_CONFIG_INVALID;
                         srs_error("unsupported vhost dvr directive %s, ret=%d", m.c_str(), ret);
@@ -1331,7 +1357,7 @@ int SrsConfig::check_config()
             } else if (n == "hls") {
                 for (int j = 0; j < (int)conf->directives.size(); j++) {
                     string m = conf->at(j)->name.c_str();
-                    if (m != "enabled" && m != "hls_path" && m != "hls_fragment" && m != "hls_window") {
+                    if (m != "enabled" && m != "hls_path" && m != "hls_fragment" && m != "hls_window" && m != "hls_on_error") {
                         ret = ERROR_SYSTEM_CONFIG_INVALID;
                         srs_error("unsupported vhost hls directive %s, ret=%d", m.c_str(), ret);
                         return ret;
@@ -1628,8 +1654,8 @@ int SrsConfig::parse_buffer(SrsConfigBuffer* buffer)
     if ((ret = root->parse(buffer)) != ERROR_SUCCESS) {
         return ret;
     }
-    
-    return check_config();
+
+    return ret;
 }
 
 string SrsConfig::cwd()
@@ -2885,6 +2911,23 @@ double SrsConfig::get_hls_window(string vhost)
     return ::atof(conf->arg0().c_str());
 }
 
+string SrsConfig::get_hls_on_error(string vhost)
+{
+    SrsConfDirective* hls = get_hls(vhost);
+    
+    if (!hls) {
+        return SRS_CONF_DEFAULT_HLS_ON_ERROR;
+    }
+    
+    SrsConfDirective* conf = hls->get("hls_on_error");
+    
+    if (!conf) {
+        return SRS_CONF_DEFAULT_HLS_ON_ERROR;
+    }
+
+    return conf->arg0();
+}
+
 SrsConfDirective* SrsConfig::get_dvr(string vhost)
 {
     SrsConfDirective* conf = get_vhost(vhost);
@@ -2966,6 +3009,23 @@ int SrsConfig::get_dvr_duration(string vhost)
     }
     
     return ::atoi(conf->arg0().c_str());
+}
+
+bool SrsConfig::get_dvr_wait_keyframe(string vhost)
+{
+    SrsConfDirective* dvr = get_dvr(vhost);
+    
+    if (!dvr) {
+        return true;
+    }
+    
+    SrsConfDirective* conf = dvr->get("dvr_wait_keyframe");
+    
+    if (!conf || conf->arg0() != "off") {
+        return true;
+    }
+    
+    return false;
 }
 
 int SrsConfig::get_dvr_time_jitter(string vhost)

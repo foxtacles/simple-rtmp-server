@@ -21,8 +21,8 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef SRS_APP_CONIFG_HPP
-#define SRS_APP_CONIFG_HPP
+#ifndef SRS_APP_CONFIG_HPP
+#define SRS_APP_CONFIG_HPP
 
 /*
 #include <srs_app_config.hpp>
@@ -48,6 +48,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define SRS_CONF_DEFAULT_HLS_PATH "./objs/nginx/html"
 #define SRS_CONF_DEFAULT_HLS_FRAGMENT 10
 #define SRS_CONF_DEFAULT_HLS_WINDOW 60
+#define SRS_CONF_DEFAULT_HLS_ON_ERROR_IGNORE "ignore"
+#define SRS_CONF_DEFAULT_HLS_ON_ERROR_DISCONNECT "disconnect"
+#define SRS_CONF_DEFAULT_HLS_ON_ERROR_CONTINUE "continue"
+#define SRS_CONF_DEFAULT_HLS_ON_ERROR SRS_CONF_DEFAULT_HLS_ON_ERROR_IGNORE
 #define SRS_CONF_DEFAULT_DVR_PATH "./objs/nginx/html"
 #define SRS_CONF_DEFAULT_DVR_PLAN_SESSION "session"
 #define SRS_CONF_DEFAULT_DVR_PLAN_SEGMENT "segment"
@@ -340,6 +344,11 @@ private:
     * parse the config file, which is specified by cli.
     */
     virtual int parse_file(const char* filename);
+public:
+    /**
+    * check the parsed config.
+    */
+    virtual int check_config();
 protected:
     /**
     * parse config from the buffer.
@@ -347,11 +356,6 @@ protected:
     * @remark, use protected for the utest to override with mock.
     */
     virtual int parse_buffer(_srs_internal::SrsConfigBuffer* buffer);
-private:
-    /**
-    * check the parsed config.
-    */
-    virtual int check_config();
 // global env
 public:
     /**
@@ -826,6 +830,13 @@ public:
     * @remark SRS will delete the ts exceed the window.
     */
     virtual double              get_hls_window(std::string vhost);
+    /**
+    * get the hls hls_on_error config.
+    * the ignore will ignore error and disable hls.
+    * the disconnect will disconnect publish connection.
+    * @see https://github.com/winlinvip/simple-rtmp-server/issues/264
+    */
+    virtual std::string         get_hls_on_error(std::string vhost);
 // dvr section
 private:
     /**
@@ -849,6 +860,10 @@ public:
     * get the duration of dvr flv, for segment plan.
     */
     virtual int                 get_dvr_duration(std::string vhost);
+    /**
+    * whether wait keyframe to reap segment, for segment plan.
+    */
+    virtual bool                get_dvr_wait_keyframe(std::string vhost);
     /**
     * get the time_jitter algorithm for dvr.
     */

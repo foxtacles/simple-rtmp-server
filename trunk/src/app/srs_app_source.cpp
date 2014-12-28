@@ -29,7 +29,6 @@ using namespace std;
 
 #include <srs_kernel_log.hpp>
 #include <srs_protocol_stack.hpp>
-#include <srs_core_autofree.hpp>
 #include <srs_protocol_amf0.hpp>
 #include <srs_kernel_codec.hpp>
 #include <srs_app_hls.hpp>
@@ -364,7 +363,7 @@ SrsGopCache::SrsGopCache()
 {
     cached_video_count = 0;
     enable_gop_cache = true;
-    audio_count_after_last_video = 0;
+    audio_after_last_video_count = 0;
 }
 
 SrsGopCache::~SrsGopCache()
@@ -397,22 +396,22 @@ int SrsGopCache::cache(SrsSharedPtrMessage* msg)
     // got video, update the video count if acceptable
     if (msg->header.is_video()) {
         cached_video_count++;
-        audio_count_after_last_video = 0;
+        audio_after_last_video_count = 0;
     }
     
     // no acceptable video or pure audio, disable the cache.
-    if (cached_video_count == 0) {
+    if (pure_audio()) {
         srs_verbose("ignore any frame util got a h264 video frame.");
         return ret;
     }
     
     // ok, gop cache enabled, and got an audio.
     if (msg->header.is_audio()) {
-        audio_count_after_last_video++;
+        audio_after_last_video_count++;
     }
     
     // clear gop cache when pure audio count overflow
-    if (audio_count_after_last_video > __SRS_PURE_AUDIO_GUESS_COUNT) {
+    if (audio_after_last_video_count > __SRS_PURE_AUDIO_GUESS_COUNT) {
         srs_warn("clear gop cache for guess pure audio overflow");
         clear();
         return ret;
@@ -445,6 +444,7 @@ void SrsGopCache::clear()
     gop_cache.clear();
 
     cached_video_count = 0;
+    audio_after_last_video_count = 0;
 }
     
 int SrsGopCache::dump(SrsConsumer* consumer, bool atc, int tba, int tbv, SrsRtmpJitterAlgorithm jitter_algorithm)
@@ -470,7 +470,7 @@ bool SrsGopCache::empty()
     return gop_cache.empty();
 }
 
-int64_t SrsGopCache::get_start_time()
+int64_t SrsGopCache::start_time()
 {
     if (empty()) {
         return 0;
@@ -480,6 +480,11 @@ int64_t SrsGopCache::get_start_time()
     srs_assert(msg);
     
     return msg->header.timestamp;
+}
+
+bool SrsGopCache::pure_audio()
+{
+    return cached_video_count == 0;
 }
 
 std::map<std::string, SrsSource*> SrsSource::pool;
@@ -851,8 +856,8 @@ int SrsSource::on_dvr_request_sh()
     // when reload to start dvr, dvr will never get the sequence header in stream,
     // use the SrsSource.on_dvr_request_sh to push the sequence header to DVR.
     if (cache_metadata) {
-        char* payload = (char*)cache_metadata->payload;
-        int size = (int)cache_metadata->size;
+        char* payload = cache_metadata->payload;
+        int size = cache_metadata->size;
         
         SrsStream stream;
         if ((ret = stream.initialize(payload, size)) != ERROR_SUCCESS) {
@@ -952,7 +957,8 @@ int SrsSource::on_meta_data(SrsMessage* msg, SrsOnMetaDataPacket* metadata)
     
     // add server info to metadata
     metadata->metadata->set("server", SrsAmf0Any::str(RTMP_SIG_SRS_KEY" "RTMP_SIG_SRS_VERSION" ("RTMP_SIG_SRS_URL_SHORT")"));
-    metadata->metadata->set("authors", SrsAmf0Any::str(RTMP_SIG_SRS_PRIMARY_AUTHROS));
+    metadata->metadata->set("primary", SrsAmf0Any::str(RTMP_SIG_SRS_PRIMARY));
+    metadata->metadata->set("authors", SrsAmf0Any::str(RTMP_SIG_SRS_AUTHROS));
     
     // version, for example, 1.0.0
     // add version to metadata, please donot remove it, for debug.
@@ -1050,13 +1056,30 @@ int SrsSource::on_audio(SrsMessage* __audio)
     
 #ifdef SRS_AUTO_HLS
     if ((ret = hls->on_audio(msg.copy())) != ERROR_SUCCESS) {
-        srs_warn("hls process audio message failed, ignore and disable hls. ret=%d", ret);
-        
-        // unpublish, ignore ret.
-        hls->on_unpublish();
-        
-        // ignore.
-        ret = ERROR_SUCCESS;
+        // apply the error strategy for hls.
+        // @see https://github.com/winlinvip/simple-rtmp-server/issues/264
+        std::string hls_error_strategy = _srs_config->get_hls_on_error(_req->vhost);
+        if (hls_error_strategy == SRS_CONF_DEFAULT_HLS_ON_ERROR_IGNORE) {
+            srs_warn("hls process audio message failed, ignore and disable hls. ret=%d", ret);
+            
+            // unpublish, ignore ret.
+            hls->on_unpublish();
+            
+            // ignore.
+            ret = ERROR_SUCCESS;
+        } else if (hls_error_strategy == SRS_CONF_DEFAULT_HLS_ON_ERROR_CONTINUE) {
+            // compare the sequence header with audio, continue when it's actually an sequence header.
+            if (ret == ERROR_HLS_DECODE_ERROR && cache_sh_audio && cache_sh_audio->size == msg.size) {
+                srs_warn("the audio is actually a sequence header, ignore this packet.");
+                ret = ERROR_SUCCESS;
+            } else {
+                srs_warn("hls continue audio failed. ret=%d", ret);
+                return ret;
+            }
+        } else {
+            srs_warn("hls disconnect publisher for audio error. ret=%d", ret);
+            return ret;
+        }
     }
 #endif
     
@@ -1107,7 +1130,7 @@ int SrsSource::on_audio(SrsMessage* __audio)
         SrsAvcAacCodec codec;
         SrsCodecSample sample;
         if ((ret = codec.audio_aac_demux(msg.payload, msg.size, &sample)) != ERROR_SUCCESS) {
-            srs_error("codec demux audio failed. ret=%d", ret);
+            srs_error("source codec demux audio failed. ret=%d", ret);
             return ret;
         }
         
@@ -1159,13 +1182,30 @@ int SrsSource::on_video(SrsMessage* __video)
     
 #ifdef SRS_AUTO_HLS
     if ((ret = hls->on_video(msg.copy())) != ERROR_SUCCESS) {
-        srs_warn("hls process video message failed, ignore and disable hls. ret=%d", ret);
-        
-        // unpublish, ignore ret.
-        hls->on_unpublish();
-        
-        // ignore.
-        ret = ERROR_SUCCESS;
+        // apply the error strategy for hls.
+        // @see https://github.com/winlinvip/simple-rtmp-server/issues/264
+        std::string hls_error_strategy = _srs_config->get_hls_on_error(_req->vhost);
+        if (hls_error_strategy == SRS_CONF_DEFAULT_HLS_ON_ERROR_IGNORE) {
+            srs_warn("hls process video message failed, ignore and disable hls. ret=%d", ret);
+            
+            // unpublish, ignore ret.
+            hls->on_unpublish();
+            
+            // ignore.
+            ret = ERROR_SUCCESS;
+        } else if (hls_error_strategy == SRS_CONF_DEFAULT_HLS_ON_ERROR_CONTINUE) {
+            // compare the sequence header with video, continue when it's actually an sequence header.
+            if (ret == ERROR_HLS_DECODE_ERROR && cache_sh_video && cache_sh_video->size == msg.size) {
+                srs_warn("the video is actually a sequence header, ignore this packet.");
+                ret = ERROR_SUCCESS;
+            } else {
+                srs_warn("hls continue video failed. ret=%d", ret);
+                return ret;
+            }
+        } else {
+            srs_warn("hls disconnect publisher for video error. ret=%d", ret);
+            return ret;
+        }
     }
 #endif
     
@@ -1216,7 +1256,7 @@ int SrsSource::on_video(SrsMessage* __video)
         SrsAvcAacCodec codec;
         SrsCodecSample sample;
         if ((ret = codec.video_avc_demux(msg.payload, msg.size, &sample)) != ERROR_SUCCESS) {
-            srs_error("codec demux video failed. ret=%d", ret);
+            srs_error("source codec demux video failed. ret=%d", ret);
             return ret;
         }
         
@@ -1253,7 +1293,7 @@ int SrsSource::on_aggregate(SrsMessage* msg)
     int ret = ERROR_SUCCESS;
     
     SrsStream* stream = aggregate_stream;
-    if ((ret = stream->initialize((char*)msg->payload, msg->size)) != ERROR_SUCCESS) {
+    if ((ret = stream->initialize(msg->payload, msg->size)) != ERROR_SUCCESS) {
         return ret;
     }
     
@@ -1458,13 +1498,13 @@ void SrsSource::on_unpublish()
     // if atc, update the sequence header to gop cache time.
     if (atc && !gop_cache->empty()) {
         if (cache_metadata) {
-            cache_metadata->header.timestamp = gop_cache->get_start_time();
+            cache_metadata->header.timestamp = gop_cache->start_time();
         }
         if (cache_sh_video) {
-            cache_sh_video->header.timestamp = gop_cache->get_start_time();
+            cache_sh_video->header.timestamp = gop_cache->start_time();
         }
         if (cache_sh_audio) {
-            cache_sh_audio->header.timestamp = gop_cache->get_start_time();
+            cache_sh_audio->header.timestamp = gop_cache->start_time();
         }
     }
 

@@ -30,11 +30,9 @@ using namespace std;
 
 #include <srs_kernel_log.hpp>
 #include <srs_kernel_error.hpp>
-#include <srs_app_http.hpp>
 #include <srs_app_st_socket.hpp>
 #include <srs_core_autofree.hpp>
 #include <srs_app_json.hpp>
-#include <srs_app_config.hpp>
 #include <srs_kernel_utility.hpp>
 #include <srs_app_utility.hpp>
 
@@ -62,7 +60,7 @@ bool SrsApiRoot::is_handler_valid(SrsHttpMessage* req, int& status_code, std::st
     return true;
 }
 
-bool SrsApiRoot::can_handle(const char* path, int length, const char** pchild)
+bool SrsApiRoot::can_handle(const char* path, int /*length*/, const char** pchild)
 {
     // reset the child path to path,
     // for child to reparse the path.
@@ -492,7 +490,8 @@ int SrsApiAuthors::do_process_request(SrsStSocket* skt, SrsHttpMessage* req)
     ss << __SRS_JOBJECT_START
         << __SRS_JFIELD_ERROR(ERROR_SUCCESS) << __SRS_JFIELD_CONT
         << __SRS_JFIELD_ORG("data", __SRS_JOBJECT_START)
-            << __SRS_JFIELD_STR("primary_authors", RTMP_SIG_SRS_PRIMARY_AUTHROS) << __SRS_JFIELD_CONT
+            << __SRS_JFIELD_STR("primary", RTMP_SIG_SRS_PRIMARY) << __SRS_JFIELD_CONT
+            << __SRS_JFIELD_STR("authors", RTMP_SIG_SRS_AUTHROS) << __SRS_JFIELD_CONT
             << __SRS_JFIELD_STR("contributors_link", RTMP_SIG_SRS_CONTRIBUTORS_URL) << __SRS_JFIELD_CONT
             << __SRS_JFIELD_STR("contributors", SRS_AUTO_CONSTRIBUTORS)
         << __SRS_JOBJECT_END

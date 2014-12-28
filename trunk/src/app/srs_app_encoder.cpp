@@ -31,10 +31,8 @@ using namespace std;
 #include <srs_app_config.hpp>
 #include <srs_protocol_rtmp.hpp>
 #include <srs_app_pithy_print.hpp>
-#include <srs_protocol_stack.hpp>
 #include <srs_app_ffmpeg.hpp>
 #include <srs_kernel_utility.hpp>
-#include <srs_kernel_consts.hpp>
 
 #ifdef SRS_AUTO_TRANSCODE
 
@@ -141,10 +139,10 @@ void SrsEncoder::clear_engines()
     
         std::string output = ffmpeg->output();
         
-        std::vector<std::string>::iterator it;
-        it = std::find(_transcoded_url.begin(), _transcoded_url.end(), output);
-        if (it != _transcoded_url.end()) {
-            _transcoded_url.erase(it);
+        std::vector<std::string>::iterator tu_it;
+        tu_it = std::find(_transcoded_url.begin(), _transcoded_url.end(), output);
+        if (tu_it != _transcoded_url.end()) {
+            _transcoded_url.erase(tu_it);
         }
         
         srs_freep(ffmpeg);

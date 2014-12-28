@@ -30,9 +30,7 @@ using namespace std;
 
 #include <srs_kernel_log.hpp>
 #include <srs_kernel_error.hpp>
-#include <srs_core_autofree.hpp>
 #include <srs_kernel_stream.hpp>
-#include <srs_kernel_utility.hpp>
 #include <srs_kernel_file.hpp>
 
 #define SRS_FLV_TAG_HEADER_SIZE 11
@@ -310,7 +308,7 @@ int SrsFlvDecoder::read_tag_header(char* ptype, int32_t* pdata_size, u_int32_t* 
     // Reserved UB [2]
     // Filter UB [1]
     // TagType UB [5]
-    *ptype = (int)(th[0] & 0x1F);
+    *ptype = (th[0] & 0x1F);
     
     // DataSize UI24
     char* pp = (char*)pdata_size;

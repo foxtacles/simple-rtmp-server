@@ -17,7 +17,7 @@ echo "启动SRS转发服务器成功"
 ./etc/init.d/srs-api restart; ret=$?; if [[ 0 -ne $ret ]]; then echo "错误：启动API服务器失败"; exit $ret; fi
 echo "启动API服务器成功"
 
-ip=`ifconfig|grep "inet"|grep "addr"|grep "Mask"|grep -v "127.0.0.1"|awk 'NR==1 {print $2}'|awk -F ':' '{print $2}'`
+ip=`ifconfig|grep "inet "|grep -v "127.0.0.1"|awk -F 'inet ' 'NR==1 {print $2}'|awk '{print $1}'|sed "s/addr://g"`
 port=8085
 cat<<END
 默认的12路流演示：
@@ -31,5 +31,24 @@ cat<<END
 默认的测速应用演示:
     http://$ip:$port/players/srs_bwt.html?key=35c9b402c12a7246868752e2878f7e0e&vhost=bandcheck.srs.com
 END
+
+if [[ `getenforce` != 'Disabled' ]]; then 
+	echo -e "${RED}请关闭selinux：${BLACK}";
+	echo -e "${RED}    打开配置文件：sudo vi /etc/sysconfig/selinux${BLACK}";
+	echo -e "${RED}    修改为：SELINUX=disabled${BLACK}";
+	echo -e "${RED}    重启系统：sudo reboot${BLACK}";
+fi
+
+if [[ -f /etc/init.d/iptables ]]; then
+	sudo /etc/init.d/iptables status >/dev/null 2>&1;
+	if [[ $? -ne 3 ]]; then
+		echo -e "${RED}请关闭防火墙：${BLACK}";
+		echo -e "${RED}    sudo /etc/init.d/iptables stop${BLACK}";
+	fi
+fi
+
+echo -e "${GREEN}请在hosts中添加一行：${BLACK}"
+echo -e "${RED}    $ip demo.srs.com${BLACK}"
 echo -e "${GREEN}演示地址：${BLACK}"
 echo -e "${RED}    http://$ip:$port${BLACK}"
+echo -e "@see https://github.com/winlinvip/simple-rtmp-server/wiki/v1_CN_SampleDemo"

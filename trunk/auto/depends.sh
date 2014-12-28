@@ -311,7 +311,7 @@ if [ $SRS_EMBEDED_CPU = YES ]; then
         echo "st-1.9t for arm is ok.";
     else
         # TODO: FIXME: patch the bug.
-        # patch st for arm, @see: https://github.com/winlinvip/simple-rtmp-server/wiki/SrsLinuxArm#st-arm-bug-fix
+        # patch st for arm, @see: https://github.com/winlinvip/simple-rtmp-server/wiki/v1_CN_SrsLinuxArm#st-arm-bug-fix
         echo "build st-1.9t for arm"; 
         (
             rm -rf ${SRS_OBJS}/st-1.9 && cd ${SRS_OBJS} && 
@@ -658,12 +658,19 @@ if [ $SRS_FFMPEG_TOOL = YES ]; then
     if [ ! -f ${SRS_OBJS}/ffmpeg/bin/ffmpeg ]; then echo "build ffmpeg-2.1 failed."; exit -1; fi
 fi
 
+# whether compile ffmpeg tool
+if [ $SRS_FFMPEG_TOOL = YES ]; then
+    echo "#define SRS_AUTO_FFMPEG_TOOL" >> $SRS_AUTO_HEADERS_H
+else
+    echo "#undef SRS_AUTO_FFMPEG_TOOL" >> $SRS_AUTO_HEADERS_H
+fi
+
 # whatever the FFMPEG tools, if transcode and ingest specified,
 # srs always compile the FFMPEG tool stub which used to start the FFMPEG process.
 if [ $SRS_FFMPEG_STUB = YES ]; then
-    echo "#define SRS_AUTO_FFMPEG" >> $SRS_AUTO_HEADERS_H
+    echo "#define SRS_AUTO_FFMPEG_STUB" >> $SRS_AUTO_HEADERS_H
 else
-    echo "#undef SRS_AUTO_FFMPEG" >> $SRS_AUTO_HEADERS_H
+    echo "#undef SRS_AUTO_FFMPEG_STUB" >> $SRS_AUTO_HEADERS_H
 fi
 
 if [ $SRS_TRANSCODE = YES ]; then

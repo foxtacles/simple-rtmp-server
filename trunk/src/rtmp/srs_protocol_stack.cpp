@@ -23,15 +23,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include <srs_protocol_stack.hpp>
 
-#include <srs_kernel_log.hpp>
 #include <srs_protocol_amf0.hpp>
-#include <srs_kernel_error.hpp>
 #include <srs_protocol_io.hpp>
-#include <srs_kernel_buffer.hpp>
 #include <srs_kernel_stream.hpp>
 #include <srs_core_autofree.hpp>
 #include <srs_kernel_utility.hpp>
-#include <srs_kernel_consts.hpp>
 
 using namespace std;
 
@@ -517,7 +513,7 @@ int SrsProtocol::decode_message(SrsMessage* msg, SrsPacket** ppacket)
 
     // initialize the decode stream for all message,
     // it's ok for the initialize if fast and without memory copy.
-    if ((ret = stream.initialize((char*)(msg->payload), msg->size)) != ERROR_SUCCESS) {
+    if ((ret = stream.initialize(msg->payload, msg->size)) != ERROR_SUCCESS) {
         srs_error("initialize stream failed. ret=%d", ret);
         return ret;
     }
@@ -552,7 +548,7 @@ int SrsProtocol::do_send_message(SrsMessage* msg, SrsPacket* packet)
 
     // p set to current write position,
     // it's ok when payload is NULL and size is 0.
-    char* p = (char*)msg->payload;
+    char* p = msg->payload;
     // to directly set the field.
     char* pp = NULL;
     
@@ -561,7 +557,7 @@ int SrsProtocol::do_send_message(SrsMessage* msg, SrsPacket* packet)
         // generate the header.
         char* pheader = out_header_cache;
         
-        if (p == (char*)msg->payload) {
+        if (p == msg->payload) {
             // write new chunk stream header, fmt is 0
             *pheader++ = 0x00 | (msg->header.perfer_cid & 0x3F);
             
@@ -634,7 +630,7 @@ int SrsProtocol::do_send_message(SrsMessage* msg, SrsPacket* packet)
         
         // sendout header and payload by writev.
         // decrease the sys invoke count to get higher performance.
-        int payload_size = msg->size - (p - (char*)msg->payload);
+        int payload_size = msg->size - (p - msg->payload);
         payload_size = srs_min(payload_size, out_chunk_size);
         
         // always has header
@@ -658,7 +654,7 @@ int SrsProtocol::do_send_message(SrsMessage* msg, SrsPacket* packet)
         if (msg->payload && msg->size > 0) {
             p += payload_size;
         }
-    } while (p < (char*)msg->payload + msg->size);
+    } while (p < msg->payload + msg->size);
     
     // only process the callback event when with packet
     if (packet && (ret = on_send_packet(msg, packet)) != ERROR_SUCCESS) {
@@ -878,7 +874,7 @@ int SrsProtocol::send_and_free_packet(SrsPacket* packet, int stream_id)
     msg->header.payload_length = size;
     msg->header.message_type = packet->get_message_type();
     msg->header.stream_id = stream_id;
-    msg->header.perfer_cid = packet->get_perfer_cid();
+    msg->header.perfer_cid = packet->get_prefer_cid();
 
     // donot use the auto free to free the msg,
     // for performance issue.
@@ -1503,7 +1499,8 @@ int SrsProtocol::on_recv_message(SrsMessage* msg)
             if (pkt->chunk_size < SRS_CONSTS_RTMP_MIN_CHUNK_SIZE 
                 || pkt->chunk_size > SRS_CONSTS_RTMP_MAX_CHUNK_SIZE) 
             {
-                srs_warn("accept chunk size %d, but should in [%d, %d]",
+                srs_warn("accept chunk size %d, but should in [%d, %d], "
+                    "@see: https://github.com/winlinvip/simple-rtmp-server/issues/160",
                     pkt->chunk_size, SRS_CONSTS_RTMP_MIN_CHUNK_SIZE, 
                     SRS_CONSTS_RTMP_MAX_CHUNK_SIZE);
             }
@@ -1527,6 +1524,8 @@ int SrsProtocol::on_recv_message(SrsMessage* msg)
             }
             break;
         }
+        default:
+            break;
     }
     
     return ret;
@@ -1574,6 +1573,8 @@ int SrsProtocol::on_send_packet(SrsMessage* msg, SrsPacket* packet)
             }
             break;
         }
+        default:
+            break;
     }
     
     return ret;
@@ -1669,7 +1670,7 @@ int SrsSharedPtrMessage::create(SrsMessage* msg)
 {
     int ret = ERROR_SUCCESS;
     
-    if ((ret = create(&msg->header, (char*)msg->payload, msg->size)) != ERROR_SUCCESS) {
+    if ((ret = create(&msg->header, msg->payload, msg->size)) != ERROR_SUCCESS) {
         return ret;
     }
     
@@ -1786,7 +1787,7 @@ int SrsPacket::decode(SrsStream* stream)
     return ret;
 }
 
-int SrsPacket::get_perfer_cid()
+int SrsPacket::get_prefer_cid()
 {
     return 0;
 }
@@ -1863,10 +1864,29 @@ int SrsConnectAppPacket::decode(SrsStream* stream)
     
     if (!stream->empty()) {
         srs_freep(args);
-        args = SrsAmf0Any::object();
-        if ((ret = args->read(stream)) != ERROR_SUCCESS) {
-            srs_error("amf0 decode connect args failed. ret=%d", ret);
+        
+        // see: https://github.com/winlinvip/simple-rtmp-server/issues/186
+        // the args maybe any amf0, for instance, a string. we should drop if not object.
+        SrsAmf0Any* any = NULL;
+        if ((ret = SrsAmf0Any::discovery(stream, &any)) != ERROR_SUCCESS) {
+            srs_error("amf0 find connect args failed. ret=%d", ret);
             return ret;
+        }
+        srs_assert(any);
+        
+        // read the instance
+        if ((ret = any->read(stream)) != ERROR_SUCCESS) {
+            srs_error("amf0 decode connect args failed. ret=%d", ret);
+            srs_freep(any);
+            return ret;
+        }
+        
+        // drop when not an AMF0 object.
+        if (!any->is_object()) {
+            srs_warn("drop the args, see: '4.1.1. connect', marker=%#x", any->marker);
+            srs_freep(any);
+        } else {
+            args = any->to_object();
         }
     }
     
@@ -1875,7 +1895,7 @@ int SrsConnectAppPacket::decode(SrsStream* stream)
     return ret;
 }
 
-int SrsConnectAppPacket::get_perfer_cid()
+int SrsConnectAppPacket::get_prefer_cid()
 {
     return RTMP_CID_OverConnection;
 }
@@ -1989,7 +2009,7 @@ int SrsConnectAppResPacket::decode(SrsStream* stream)
     return ret;
 }
 
-int SrsConnectAppResPacket::get_perfer_cid()
+int SrsConnectAppResPacket::get_prefer_cid()
 {
     return RTMP_CID_OverConnection;
 }
@@ -2101,7 +2121,7 @@ int SrsCallPacket::decode(SrsStream* stream)
     return ret;
 }
 
-int SrsCallPacket::get_perfer_cid()
+int SrsCallPacket::get_prefer_cid()
 {
     return RTMP_CID_OverConnection;
 }
@@ -2175,7 +2195,7 @@ SrsCallResPacket::~SrsCallResPacket()
     srs_freep(response);
 }
 
-int SrsCallResPacket::get_perfer_cid()
+int SrsCallResPacket::get_prefer_cid()
 {
     return RTMP_CID_OverConnection;
 }
@@ -2278,7 +2298,7 @@ int SrsCreateStreamPacket::decode(SrsStream* stream)
     return ret;
 }
 
-int SrsCreateStreamPacket::get_perfer_cid()
+int SrsCreateStreamPacket::get_prefer_cid()
 {
     return RTMP_CID_OverConnection;
 }
@@ -2369,7 +2389,7 @@ int SrsCreateStreamResPacket::decode(SrsStream* stream)
     return ret;
 }
 
-int SrsCreateStreamResPacket::get_perfer_cid()
+int SrsCreateStreamResPacket::get_prefer_cid()
 {
     return RTMP_CID_OverConnection;
 }
@@ -2505,7 +2525,7 @@ int SrsFMLEStartPacket::decode(SrsStream* stream)
     return ret;
 }
 
-int SrsFMLEStartPacket::get_perfer_cid()
+int SrsFMLEStartPacket::get_prefer_cid()
 {
     return RTMP_CID_OverConnection;
 }
@@ -2626,7 +2646,7 @@ int SrsFMLEStartResPacket::decode(SrsStream* stream)
     return ret;
 }
 
-int SrsFMLEStartResPacket::get_perfer_cid()
+int SrsFMLEStartResPacket::get_prefer_cid()
 {
     return RTMP_CID_OverConnection;
 }
@@ -2729,7 +2749,7 @@ int SrsPublishPacket::decode(SrsStream* stream)
     return ret;
 }
 
-int SrsPublishPacket::get_perfer_cid()
+int SrsPublishPacket::get_prefer_cid()
 {
     return RTMP_CID_OverStream;
 }
@@ -2914,7 +2934,7 @@ int SrsPlayPacket::decode(SrsStream* stream)
         if (reset_value->is_boolean()) {
             reset = reset_value->to_boolean();
         } else if (reset_value->is_number()) {
-            reset = (reset_value->to_number() == 0 ? false : true);
+            reset = (reset_value->to_number() != 0);
         } else {
             ret = ERROR_RTMP_AMF0_DECODE;
             srs_error("amf0 invalid type=%#x, requires number or bool, ret=%d", reset_value->marker, ret);
@@ -2927,7 +2947,7 @@ int SrsPlayPacket::decode(SrsStream* stream)
     return ret;
 }
 
-int SrsPlayPacket::get_perfer_cid()
+int SrsPlayPacket::get_prefer_cid()
 {
     return RTMP_CID_OverStream;
 }
@@ -3010,7 +3030,7 @@ SrsPlayResPacket::~SrsPlayResPacket()
     srs_freep(desc);
 }
 
-int SrsPlayResPacket::get_perfer_cid()
+int SrsPlayResPacket::get_prefer_cid()
 {
     return RTMP_CID_OverStream;
 }
@@ -3072,7 +3092,7 @@ SrsOnBWDonePacket::~SrsOnBWDonePacket()
     srs_freep(args);
 }
 
-int SrsOnBWDonePacket::get_perfer_cid()
+int SrsOnBWDonePacket::get_prefer_cid()
 {
     return RTMP_CID_OverConnection;
 }
@@ -3129,7 +3149,7 @@ SrsOnStatusCallPacket::~SrsOnStatusCallPacket()
     srs_freep(data);
 }
 
-int SrsOnStatusCallPacket::get_perfer_cid()
+int SrsOnStatusCallPacket::get_prefer_cid()
 {
     return RTMP_CID_OverStream;
 }
@@ -3225,7 +3245,7 @@ int SrsBandwidthPacket::decode(SrsStream *stream)
     return ret;
 }
 
-int SrsBandwidthPacket::get_perfer_cid()
+int SrsBandwidthPacket::get_prefer_cid()
 {
     return RTMP_CID_OverStream;
 }
@@ -3414,7 +3434,7 @@ SrsOnStatusDataPacket::~SrsOnStatusDataPacket()
     srs_freep(data);
 }
 
-int SrsOnStatusDataPacket::get_perfer_cid()
+int SrsOnStatusDataPacket::get_prefer_cid()
 {
     return RTMP_CID_OverStream;
 }
@@ -3461,7 +3481,7 @@ SrsSampleAccessPacket::~SrsSampleAccessPacket()
 {
 }
 
-int SrsSampleAccessPacket::get_perfer_cid()
+int SrsSampleAccessPacket::get_prefer_cid()
 {
     return RTMP_CID_OverStream;
 }
@@ -3565,7 +3585,7 @@ int SrsOnMetaDataPacket::decode(SrsStream* stream)
     return ret;
 }
 
-int SrsOnMetaDataPacket::get_perfer_cid()
+int SrsOnMetaDataPacket::get_prefer_cid()
 {
     return RTMP_CID_OverConnection2;
 }
@@ -3625,7 +3645,7 @@ int SrsSetWindowAckSizePacket::decode(SrsStream* stream)
     return ret;
 }
 
-int SrsSetWindowAckSizePacket::get_perfer_cid()
+int SrsSetWindowAckSizePacket::get_prefer_cid()
 {
     return RTMP_CID_ProtocolControl;
 }
@@ -3667,7 +3687,7 @@ SrsAcknowledgementPacket::~SrsAcknowledgementPacket()
 {
 }
 
-int SrsAcknowledgementPacket::get_perfer_cid()
+int SrsAcknowledgementPacket::get_prefer_cid()
 {
     return RTMP_CID_ProtocolControl;
 }
@@ -3725,7 +3745,7 @@ int SrsSetChunkSizePacket::decode(SrsStream* stream)
     return ret;
 }
 
-int SrsSetChunkSizePacket::get_perfer_cid()
+int SrsSetChunkSizePacket::get_prefer_cid()
 {
     return RTMP_CID_ProtocolControl;
 }
@@ -3767,7 +3787,7 @@ SrsSetPeerBandwidthPacket::~SrsSetPeerBandwidthPacket()
 {
 }
 
-int SrsSetPeerBandwidthPacket::get_perfer_cid()
+int SrsSetPeerBandwidthPacket::get_prefer_cid()
 {
     return RTMP_CID_ProtocolControl;
 }
@@ -3841,7 +3861,7 @@ int SrsUserControlPacket::decode(SrsStream* stream)
     return ret;
 }
 
-int SrsUserControlPacket::get_perfer_cid()
+int SrsUserControlPacket::get_prefer_cid()
 {
     return RTMP_CID_ProtocolControl;
 }

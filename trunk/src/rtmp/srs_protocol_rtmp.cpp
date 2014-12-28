@@ -24,12 +24,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <srs_protocol_rtmp.hpp>
 
 #include <srs_core_autofree.hpp>
-#include <srs_kernel_log.hpp>
-#include <srs_kernel_error.hpp>
 #include <srs_protocol_io.hpp>
 #include <srs_protocol_amf0.hpp>
 #include <srs_protocol_handshake.hpp>
-#include <srs_protocol_stack.hpp>
 #include <srs_protocol_utility.hpp>
 #include <srs_kernel_stream.hpp>
 #include <srs_kernel_utility.hpp>
@@ -172,7 +169,6 @@ string srs_client_type_string(SrsRtmpConnType type)
         case SrsRtmpConnFMLEPublish: return "publish(FMLEPublish)";
         default: return "Unknown";
     }
-    return "Unknown";
 }
 
 SrsHandshakeBytes::SrsHandshakeBytes() 
@@ -439,20 +435,22 @@ int SrsRtmpClient::connect_app(string app, string tc_url,
 {
     std::string srs_server_ip;
     std::string srs_server;
-    std::string srs_primary_authors;
+    std::string srs_primary;
+    std::string srs_authors;
     std::string srs_version;
     int srs_id = 0;
     int srs_pid = 0;
     
     return connect_app2(app, tc_url, req, debug_srs_upnode,
-        srs_server_ip, srs_server, srs_primary_authors, 
+        srs_server_ip, srs_server, srs_primary, srs_authors, 
         srs_version, srs_id, srs_pid);
 }
 
 int SrsRtmpClient::connect_app2(
     string app, string tc_url, SrsRequest* req, bool debug_srs_upnode,
-    string& srs_server_ip, string& srs_server, string& srs_primary_authors, 
-    string& srs_version, int& srs_id, int& srs_pid
+    string& srs_server_ip, string& srs_server, string& srs_primary, 
+    string& srs_authors, string& srs_version, int& srs_id, 
+    int& srs_pid
 ){
     int ret = ERROR_SUCCESS;
     
@@ -517,8 +515,11 @@ int SrsRtmpClient::connect_app2(
         SrsAmf0EcmaArray* arr = data->to_ecma_array();
         
         SrsAmf0Any* prop = NULL;
-        if ((prop = arr->ensure_property_string("srs_primary_authors")) != NULL) {
-            srs_primary_authors = prop->to_str();
+        if ((prop = arr->ensure_property_string("srs_primary")) != NULL) {
+            srs_primary = prop->to_str();
+        }
+        if ((prop = arr->ensure_property_string("srs_authors")) != NULL) {
+            srs_authors = prop->to_str();
         }
         if ((prop = arr->ensure_property_string("srs_version")) != NULL) {
             srs_version = prop->to_str();
@@ -912,7 +913,8 @@ int SrsRtmpServer::response_connect_app(SrsRequest *req, const char* server_ip)
     data->set("srs_site", SrsAmf0Any::str(RTMP_SIG_SRS_WEB));
     data->set("srs_email", SrsAmf0Any::str(RTMP_SIG_SRS_EMAIL));
     data->set("srs_copyright", SrsAmf0Any::str(RTMP_SIG_SRS_COPYRIGHT));
-    data->set("srs_primary_authors", SrsAmf0Any::str(RTMP_SIG_SRS_PRIMARY_AUTHROS));
+    data->set("srs_primary", SrsAmf0Any::str(RTMP_SIG_SRS_PRIMARY));
+    data->set("srs_authors", SrsAmf0Any::str(RTMP_SIG_SRS_AUTHROS));
     
     if (server_ip) {
         data->set("srs_server_ip", SrsAmf0Any::str(server_ip));
@@ -930,7 +932,7 @@ int SrsRtmpServer::response_connect_app(SrsRequest *req, const char* server_ip)
     return ret;
 }
 
-void SrsRtmpServer::response_connect_reject(SrsRequest *req, const char* desc)
+void SrsRtmpServer::response_connect_reject(SrsRequest* /*req*/, const char* desc)
 {
     int ret = ERROR_SUCCESS;
 

@@ -30,9 +30,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 using namespace std;
 
 #include <srs_protocol_rtmp.hpp>
-#include <srs_kernel_error.hpp>
 #include <srs_protocol_amf0.hpp>
-#include <srs_protocol_stack.hpp>
 #include <srs_app_config.hpp>
 #include <srs_core_autofree.hpp>
 #include <srs_kernel_utility.hpp>
@@ -57,8 +55,8 @@ SrsBandwidthSample::~SrsBandwidthSample()
 
 void SrsBandwidthSample::calc_kbps(int _bytes, int _duration)
 {
-    bytes = (int)_bytes;
-    actual_duration_ms = (int)_duration;
+    bytes = _bytes;
+    actual_duration_ms = _duration;
     
     if (actual_duration_ms <= 0) {
         return;
@@ -319,7 +317,7 @@ int SrsBandwidth::play_checking(SrsBandwidthSample* sample, SrsKbpsLimit* limit)
     return ret;
 }
 
-int SrsBandwidth::play_stop(SrsBandwidthSample* sample, SrsKbpsLimit* limit)
+int SrsBandwidth::play_stop(SrsBandwidthSample* sample, SrsKbpsLimit* /*limit*/)
 {
     int ret = ERROR_SUCCESS;
 
@@ -405,7 +403,7 @@ int SrsBandwidth::publish_checking(SrsBandwidthSample* sample, SrsKbpsLimit* lim
     return ret;
 }
 
-int SrsBandwidth::publish_stop(SrsBandwidthSample* sample, SrsKbpsLimit* limit)
+int SrsBandwidth::publish_stop(SrsBandwidthSample* sample, SrsKbpsLimit* /*limit*/)
 {
     int ret = ERROR_SUCCESS;
 

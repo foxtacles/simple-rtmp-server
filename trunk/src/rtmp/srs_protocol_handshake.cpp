@@ -947,7 +947,7 @@ namespace _srs_internal
             // directly generate the public key.
             // @see: https://github.com/winlinvip/simple-rtmp-server/issues/148
             int pkey_size = 128;
-            if ((ret = dh.copy_public_key((char*)block0.key.key, pkey_size)) != ERROR_SUCCESS) {
+            if ((ret = dh.copy_public_key(block0.key.key, pkey_size)) != ERROR_SUCCESS) {
                 srs_error("calc s1 key failed. ret=%d", ret);
                 return ret;
             }
@@ -959,7 +959,7 @@ namespace _srs_internal
             // directly generate the public key.
             // @see: https://github.com/winlinvip/simple-rtmp-server/issues/148
             int pkey_size = 128;
-            if ((ret = dh.copy_public_key((char*)block1.key.key, pkey_size)) != ERROR_SUCCESS) {
+            if ((ret = dh.copy_public_key(block1.key.key, pkey_size)) != ERROR_SUCCESS) {
                 srs_error("calc s1 key failed. ret=%d", ret);
                 return ret;
             }
@@ -1262,7 +1262,7 @@ int SrsComplexHandshake::handshake_with_server(SrsHandshakeBytes* /*hs_bytes*/, 
 int SrsComplexHandshake::handshake_with_server(SrsHandshakeBytes* hs_bytes, ISrsProtocolReaderWriter* io)
 {
     int ret = ERROR_SUCCESS;
-    
+
     ssize_t nsize;
     
     // complex handshake
@@ -1277,6 +1277,7 @@ int SrsComplexHandshake::handshake_with_server(SrsHandshakeBytes* hs_bytes, ISrs
         return ret;
     }
     c1.dump(hs_bytes->c0c1 + 1);
+
     // verify c1
     bool is_valid;
     if ((ret = c1.c1_validate_digest(is_valid)) != ERROR_SUCCESS || !is_valid) {
@@ -1316,10 +1317,12 @@ int SrsComplexHandshake::handshake_with_server(SrsHandshakeBytes* hs_bytes, ISrs
     if ((ret = hs_bytes->create_c2()) != ERROR_SUCCESS) {
         return ret;
     }
+
     c2s2 c2;
     if ((ret = c2.c2_create(&s1)) != ERROR_SUCCESS) {
         return ret;
     }
+
     c2.dump(hs_bytes->c2);
     if ((ret = io->write(hs_bytes->c2, 1536, &nsize)) != ERROR_SUCCESS) {
         srs_warn("complex handshake write c2 failed. ret=%d", ret);

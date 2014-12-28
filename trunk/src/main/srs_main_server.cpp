@@ -38,7 +38,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <srs_app_server.hpp>
 #include <srs_app_config.hpp>
 #include <srs_app_log.hpp>
-#include <srs_app_utility.hpp>
 #include <srs_kernel_utility.hpp>
 
 // pre-declare
@@ -55,14 +54,103 @@ ISrsThreadContext* _srs_context = new SrsThreadContext();
 SrsConfig* _srs_config = new SrsConfig();
 SrsServer* _srs_server = new SrsServer();
 
-// main entrance.
+/**
+* show the features by macro, the actual macro values.
+*/
+void show_macro_features()
+{
+#ifdef SRS_AUTO_SSL
+    srs_trace("rtmp handshake: on");
+#else
+    srs_warn("rtmp handshake: off");
+#endif
+
+#ifdef SRS_AUTO_HLS
+    srs_trace("hls: on");
+#else
+    srs_warn("hls: off");
+#endif
+
+#ifdef SRS_AUTO_HTTP_CALLBACK
+    srs_trace("http callback: on");
+#else
+    srs_warn("http callback: off");
+#endif
+
+#ifdef SRS_AUTO_HTTP_API
+    srs_trace("http api: on");
+#else
+    srs_warn("http api: off");
+#endif
+
+#ifdef SRS_AUTO_HTTP_SERVER
+    srs_trace("http server: on");
+#else
+    srs_warn("http server: off");
+#endif
+
+#ifdef SRS_AUTO_HTTP_PARSER
+    srs_trace("http parser: on");
+#else
+    srs_warn("http parser: off");
+#endif
+
+#ifdef SRS_AUTO_DVR
+    srs_trace("dvr: on");
+#else
+    srs_warn("dvr: off");
+#endif
+
+#ifdef SRS_AUTO_TRANSCODE
+    srs_trace("transcode: on");
+#else
+    srs_warn("transcode: off");
+#endif
+
+#ifdef SRS_AUTO_INGEST
+    srs_trace("ingest: on");
+#else
+    srs_warn("ingest: off");
+#endif
+
+#ifdef SRS_AUTO_STAT
+    srs_trace("system stat: on");
+#else
+    srs_warn("system stat: off");
+#endif
+
+#ifdef SRS_AUTO_NGINX
+    srs_trace("compile nginx: on");
+#else
+    srs_warn("compile nginx: off");
+#endif
+
+#ifdef SRS_AUTO_FFMPEG_TOOL
+    srs_trace("compile ffmpeg: on");
+#else
+    srs_warn("compile ffmpeg: off");
+#endif
+}
+
+void check_macro_features()
+{
+#if VERSION_MAJOR > 1
+    srs_warn("SRS %s is develop branch, please use %s instead", RTMP_SIG_SRS_VERSION, RTMP_SIG_SRS_RELEASE);
+#endif
+}
+
+/**
+* main entrance.
+*/
 int main(int argc, char** argv) 
 {
     int ret = ERROR_SUCCESS;
-    
+
     // TODO: support both little and big endian.
     srs_assert(srs_is_little_endian());
 
+    // for gperf gmp or gcp, 
+    // should never enable it when not enabled for performance issue.
 #ifdef SRS_AUTO_GPERF_MP
     HeapProfilerStart("gperf.srs.gmp");
 #endif
@@ -70,14 +158,12 @@ int main(int argc, char** argv)
     ProfilerStart("gperf.srs.gcp");
 #endif
 
-#ifdef SRS_AUTO_GPERF_MC
-    #ifdef SRS_AUTO_GPERF_MP
-    srs_error("option --with-gmc confict with --with-gmp, "
+    // directly compile error when these two macro defines.
+#if defined(SRS_AUTO_GPERF_MC) && defined(SRS_AUTO_GPERF_MP)
+    #error ("option --with-gmc confict with --with-gmp, "
         "@see: http://google-perftools.googlecode.com/svn/trunk/doc/heap_checker.html\n"
         "Note that since the heap-checker uses the heap-profiling framework internally, "
         "it is not possible to run both the heap-checker and heap profiler at the same time");
-    return -1;
-    #endif
 #endif
     
     // never use srs log(srs_trace, srs_error, etc) before config parse the option,
@@ -90,9 +176,17 @@ int main(int argc, char** argv)
     if ((ret = _srs_log->initialize()) != ERROR_SUCCESS) {
         return ret;
     }
+
+    // we check the config when the log initialized.
+    if ((ret = _srs_config->check_config()) != ERROR_SUCCESS) {
+        return ret;
+    }
     
     srs_trace("srs(simple-rtmp-server) "RTMP_SIG_SRS_VERSION);
     srs_trace("license: "RTMP_SIG_SRS_LICENSE);
+    srs_trace("primary: "RTMP_SIG_SRS_PRIMARY);
+    srs_trace("authors: "RTMP_SIG_SRS_AUTHROS);
+    srs_trace("contributors: "SRS_AUTO_CONSTRIBUTORS);
     srs_trace("uname: "SRS_AUTO_UNAME);
     srs_trace("build: %s, %s", SRS_AUTO_BUILD_DATE, srs_is_little_endian()? "little-endian":"big-endian");
     srs_trace("configure: "SRS_AUTO_USER_CONFIGURE);
@@ -101,6 +195,16 @@ int main(int argc, char** argv)
     srs_trace("arm tool chain: "SRS_AUTO_EMBEDED_TOOL_CHAIN);
 #endif
     srs_trace("conf: %s, limit: %d", _srs_config->config().c_str(), _srs_config->get_max_connections());
+    
+    // features
+    show_macro_features();
+    check_macro_features();
+
+    // for special features.
+#ifdef SRS_AUTO_HTTP_SERVER
+    srs_warn("http server is dev feature, "
+        "@see https://github.com/winlinvip/simple-rtmp-server/wiki/v1_CN_HTTPServer#feature");
+#endif
     
     /**
     * we do nothing in the constructor of server,
@@ -138,7 +242,6 @@ int run()
         }
         srs_trace("grandpa process exit.");
         exit(0);
-        return 0;
     }
 
     // father
@@ -152,7 +255,6 @@ int run()
     if(pid > 0) {
         srs_trace("father process exit. ret=0");
         exit(0);
-        return 0;
     }
 
     // son
